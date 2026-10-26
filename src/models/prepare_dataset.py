@@ -19,7 +19,12 @@ DATA_DIR = SCRIPT_DIR.parent / "data"
 
 # The processed dataset will be saved in src/data/processed/
 OUTPUT_DIR = DATA_DIR / "processed"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+ORIGINAL_DIR = OUTPUT_DIR / "original" / "images"
+AUGMENTED_DIR = OUTPUT_DIR / "augmented" / "images"
+ORIGINAL_META_DIR = OUTPUT_DIR / "original" / "metadata"
+AUGMENTED_META_DIR = OUTPUT_DIR / "augmented" / "metadata"
+for d in (ORIGINAL_DIR, AUGMENTED_DIR, ORIGINAL_META_DIR, AUGMENTED_META_DIR):
+    d.mkdir(parents=True, exist_ok=True)
 
 AUGMENTATIONS_PER_IMAGE = 2
 
@@ -54,25 +59,29 @@ def is_grayscale(image):
         and np.abs(rgb[:, :, 0] - rgb[:, :, 2]).max() <= 2
     )
 
-# Store metadata alongside the images
-metadata_file = OUTPUT_DIR / "metadata.csv"
+# Each image set has its own metadata file, in a metadata/ dir beside images/
+FIELDNAMES = [
+    "filename", "label", "class_name",
+    "description", "image_type", "original_id"
+]
 
 removed = 0
 originals = 0
 augmented = 0
 
-with metadata_file.open(
-    "w", newline="", encoding="utf-8"
-) as file:
+with (
+    (ORIGINAL_META_DIR / "metadata.csv").open(
+        "w", newline="", encoding="utf-8"
+    ) as original_file,
+    (AUGMENTED_META_DIR / "metadata.csv").open(
+        "w", newline="", encoding="utf-8"
+    ) as augmented_file,
+):
 
-    writer = csv.DictWriter(
-        file,
-        fieldnames=[
-            "filename", "label", "class_name",
-            "description", "image_type", "original_id"
-        ],
-    )
-    writer.writeheader()
+    original_writer = csv.DictWriter(original_file, fieldnames=FIELDNAMES)
+    augmented_writer = csv.DictWriter(augmented_file, fieldnames=FIELDNAMES)
+    original_writer.writeheader()
+    augmented_writer.writeheader()
 
     for i, row in enumerate(tqdm(ds, desc="Processing")):
         image = row["image"].convert("RGB")
@@ -94,10 +103,10 @@ with metadata_file.open(
 
         # 2. Save original color image
         filename = f"{safe_id}_original.jpg"
-        image.save(OUTPUT_DIR / filename, quality=95)
+        image.save(ORIGINAL_DIR / filename, quality=95)
         originals += 1
 
-        writer.writerow({
+        original_writer.writerow({
             "filename": filename,
             "label": label,
             "class_name": class_name,
@@ -112,12 +121,12 @@ with metadata_file.open(
             new_filename = f"{safe_id}_aug_{j + 1}.jpg"
 
             new_image.save(
-                OUTPUT_DIR / new_filename,
+                AUGMENTED_DIR / new_filename,
                 quality=95
             )
             augmented += 1
 
-            writer.writerow({
+            augmented_writer.writerow({
                 "filename": new_filename,
                 "label": label,
                 "class_name": class_name,
