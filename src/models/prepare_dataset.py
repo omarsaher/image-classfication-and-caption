@@ -49,6 +49,23 @@ augment = transforms.Compose([
     ),
 ])
 
+MAX_SIMILARITY = 0.90
+MAX_ATTEMPTS = 10
+
+def thumbnail(image):
+    """Small zero-mean, unit-norm grayscale vector for similarity checks."""
+    gray = np.asarray(
+        image.convert("L").resize((24, 24)), dtype=np.float32
+    ).ravel()
+    gray -= gray.mean()
+    return gray / (np.linalg.norm(gray) + 1e-6)
+
+def too_similar(candidate, references):
+    """True if the candidate is a near-copy of any reference image."""
+    return any(
+        float(candidate @ ref) > MAX_SIMILARITY for ref in references
+    )
+
 def is_grayscale(image):
     """Detect images without meaningful color."""
     rgb = np.asarray(image.convert("RGB"), dtype=np.int16)
@@ -116,8 +133,18 @@ with (
         })
 
         # 3. Create and save augmented copies
+        seen = [thumbnail(image)]
         for j in range(AUGMENTATIONS_PER_IMAGE):
-            new_image = augment(image)
+            # Re-draw until the copy differs from the original and the
+            # earlier augmentations (a tiny rotation is a near-duplicate)
+            for _ in range(MAX_ATTEMPTS):
+                new_image = augment(image)
+                new_thumb = thumbnail(new_image)
+                if not too_similar(new_thumb, seen):
+                    break
+            else:
+                continue
+            seen.append(new_thumb)
             new_filename = f"{safe_id}_aug_{j + 1}.jpg"
 
             new_image.save(
