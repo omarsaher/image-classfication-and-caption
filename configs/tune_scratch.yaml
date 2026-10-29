@@ -1,0 +1,29 @@
+# Hyperparameter search for the from-scratch encoder (Milestone 1).
+# Both methods get the same budget (12 trials x 12 epochs) on the same
+# data (originals only), split and seed, so they can be compared fairly.
+
+base_config: configs/cls_scratch.yaml
+output_dir: outputs/tuning
+metric: best_val_acc
+
+# Applied to every trial: short runs, no checkpoints
+trial_overrides:
+  train.epochs: 12
+  train.warmup_epochs: 1
+  train.early_stopping_patience: 12
+  train.save_checkpoint: false
+  data.use_offline_augmented: false
+
+grid:
+  train.lr: [0.0003, 0.001, 0.003]
+  train.weight_decay: [0.01, 0.05]
+  model.width_mult: [0.5, 1.0]
+
+random:
+  n_trials: 12
+  seed: 123
+  space:
+    train.lr: {type: loguniform, low: 0.0001, high: 0.005}
+    train.weight_decay: {type: loguniform, low: 0.001, high: 0.1}
+    model.dropout: {type: uniform, low: 0.0, high: 0.5}
+    model.width_mult: {type: choice, values: [0.5, 1.0]}
