@@ -34,3 +34,14 @@ def plot_training_curves(history, path, title=None):
     if title:
         fig.suptitle(title)
     return _save(fig, path)
+
+
+def plot_confusion_matrix(cm, path, title="Confusion matrix"):
+    """Row-normalised 200x200 heatmap; a bright diagonal means correct predictions."""
+    row_sums = cm.sum(axis=1, keepdims=True)
+    normalised = cm / row_sums.clip(min=1)
+    fig, ax = plt.subplots(figsize=(8, 7))
+    image = ax.imshow(normalised, cmap="viridis", vmin=0, vmax=1)
+    ax.set(xlabel="predicted class index", ylabel="true class index", title=title)
+    fig.colorbar(image, ax=ax, fraction=0.046, label="share of true class")
+    return _save(fig, path)
