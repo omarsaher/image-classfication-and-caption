@@ -1,0 +1,52 @@
+# From-scratch CNN encoder for 200-class bird classification (Task 1.2).
+# Paths are relative to the repository root; run the CLI from there.
+# Any value can be overridden from the command line, e.g.
+#   --set train.lr=0.003 data.use_offline_augmented=true
+
+experiment:
+  name: scratch_resnet_originals
+  seed: 42
+  output_dir: outputs/classification
+
+data:
+  original_images: src/data/original/images
+  original_metadata: src/data/original/metadata/metadata.csv
+  augmented_images: src/data/processed/augmented/images
+  augmented_metadata: src/data/processed/augmented/metadata/metadata.csv
+  use_offline_augmented: false   # Run A: false (originals only), Run B: true
+  val_per_class: 5
+  split_file: splits/val_original_ids.json
+  stats_file: splits/norm_stats.json
+  hf_cache_dir: null
+  image_size: 224
+  resize_size: 256
+  crop_scale: [0.35, 1.0]
+  color_jitter: 0.1
+  batch_size: 64
+  num_workers: 4
+
+model:
+  name: scratch_resnet
+  num_classes: 200
+  width_mult: 0.5
+  blocks_per_stage: [2, 2, 2, 2]
+  dropout: 0.3
+
+train:
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.05
+  warmup_epochs: 5
+  label_smoothing: 0.1
+  early_stopping_patience: 20
+  amp: true
+  save_checkpoint: true
+  max_batches: null   # limit batches per epoch, only for quick smoke tests
+
+tracking:
+  backend: wandb      # wandb | none
+  project: cub-pixels-to-language
+  entity: null
+  mode: online        # online | offline
+  group: null
+  log_checkpoint: true
