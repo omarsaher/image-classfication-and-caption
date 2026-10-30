@@ -44,9 +44,11 @@ train:
   max_batches: null   # limit batches per epoch, only for quick smoke tests
 
 tracking:
-  backend: wandb      # wandb | none
-  project: cub-pixels-to-language
-  entity: null
-  mode: online        # online | offline
+  backend: mlflow     # mlflow | wandb | none
+  project: cub-pixels-to-language    # MLflow experiment / W&B project
+  uri: sqlite:///outputs/mlflow.db   # MLflow only: local store, view with `mlflow ui`
+  artifact_dir: outputs/mlartifacts  # MLflow only: logged plots
+  entity: null        # W&B only
+  mode: online        # W&B only: online | offline
   group: null
-  log_checkpoint: true
+  log_checkpoint: false   # also copy best.pt into the tracker (it is always saved in the run folder)

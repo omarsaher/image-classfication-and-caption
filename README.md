@@ -35,8 +35,11 @@ Python 3.10+.
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-wandb login                      # or set WANDB_API_KEY; use --set tracking.backend=none to skip tracking
 ```
+
+Experiments are tracked with MLflow in a local store (`outputs/mlflow.db`), so no account
+is needed. Use `--set tracking.backend=none` to skip tracking, or `tracking.backend=wandb`
+to log to Weights & Biases instead.
 
 Data:
 - Training/validation images come from Task 1.1 (`src/data/original`, `src/data/processed/augmented`),
@@ -103,12 +106,22 @@ python -m src.cli predict --task classification \
     --checkpoint outputs/classification/scratch_A_originals/best.pt --image path/to/bird.jpg
 ```
 
+### Experiment tracking
+
+Every run logs its config, per-epoch metrics and plots to MLflow. To browse and compare runs:
+
+```bash
+mlflow ui --backend-store-uri sqlite:///outputs/mlflow.db
+```
+
+then open http://127.0.0.1:5000. Tuning trials are tagged `group=tune_grid` / `tune_random`.
+
 ### Running on Kaggle
 
 Open `notebooks/kaggle_train_scratch.ipynb` on Kaggle, enable a GPU and internet,
-add the secrets `GITHUB_TOKEN` and `WANDB_API_KEY`, then use
-*Save & Run All*. The notebook clones the repository and runs the CLI commands
-above; results are saved in the notebook output (`/kaggle/working/outputs`).
+add the secret `GITHUB_TOKEN`, then use *Save & Run All*. The notebook clones the
+repository and runs the CLI commands above; results, including the MLflow store,
+are saved in the notebook output (`/kaggle/working/outputs`).
 
 ### Quick local check (CPU)
 
