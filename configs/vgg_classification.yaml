@@ -1,0 +1,48 @@
+# Pretrained VGG13 / VGG16 / VGG19 for 200-class bird classification.
+# Paths are relative to the repository root.
+# Defaults are small enough for a CPU; raise data.batch_size on a GPU.
+
+# The data section of this file is merged over the team's data section, so the
+# split, statistics, image folders and augmentation stay defined in one place.
+data_config: cls_scratch.yaml
+
+experiment:
+  name: vgg_classification
+  seed: 42
+  output_dir: outputs/vgg_classification
+  checkpoint_dir: outputs/vgg_classification/checkpoints
+
+data:
+  image_size: 224
+  resize_size: 256
+  batch_size: 8
+  num_workers: 0        # 0 is the safe choice on Windows and in Jupyter
+
+model:
+  architectures: [vgg13, vgg16, vgg19]
+  num_classes: 200
+  dropout: 0.5          # same value as the official VGG classifier
+  pretrained: true
+
+# Settings shared by both training phases
+train:
+  weight_decay: 0.01
+  label_smoothing: 0.1
+  amp: true             # mixed precision; the Trainer only enables it on CUDA
+  max_batches: null     # limit batches per epoch, only for quick checks
+
+# Write learning rates as 0.0003 or 3.0e-4: YAML reads 3e-4 as text
+phases:
+  head:                 # phase 1: convolutional blocks frozen
+    epochs: 5
+    lr: 0.0003
+    warmup_epochs: 0
+    early_stopping_patience: 3
+  finetune:             # phase 2: everything trains, with a much smaller step
+    epochs: 10
+    lr: 0.00001
+    warmup_epochs: 1
+    early_stopping_patience: 4
+
+tracking:
+  backend: none         # wandb | none (wandb is not installed on this machine)
