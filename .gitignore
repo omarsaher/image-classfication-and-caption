@@ -17,3 +17,6 @@ wandb/
 Thumbs.db
 .vscode/
 .idea/
+
+# Secrets
+.env
