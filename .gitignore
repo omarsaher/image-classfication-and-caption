@@ -5,7 +5,7 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 
-# Training outputs (checkpoints, logs, figures are shared via Drive / W&B)
+# Training outputs (checkpoints, logs and the MLflow store stay local; report figures go in reports/figures)
 outputs/
 wandb/
 *.pt
