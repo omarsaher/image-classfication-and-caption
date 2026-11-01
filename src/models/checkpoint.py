@@ -10,20 +10,23 @@ import torch
 from src.models.registry import build_classifier
 
 
-def save_checkpoint(path, model, cfg, class_names, norm_stats, epoch, metrics):
+def save_checkpoint(path, model, cfg, class_names, norm_stats, epoch, metrics, training_state=None):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model_state": model.state_dict(),
-            "config": cfg,
-            "class_names": class_names,
-            "norm_stats": {"mean": list(norm_stats[0]), "std": list(norm_stats[1])},
-            "epoch": epoch,
-            "metrics": metrics,
-        },
-        path,
-    )
+    checkpoint = {
+        "model_state": model.state_dict(),
+        "config": cfg,
+        "class_names": class_names,
+        "norm_stats": {"mean": list(norm_stats[0]), "std": list(norm_stats[1])},
+        "epoch": epoch,
+        "metrics": metrics,
+    }
+    if training_state is not None:
+        checkpoint["training_state"] = training_state
+    # Write to a temporary file first so a session cut off mid-save keeps the previous checkpoint
+    temp_path = path.with_name(path.name + ".tmp")
+    torch.save(checkpoint, temp_path)
+    temp_path.replace(path)
 
 
 def load_classifier(path, device):

@@ -110,6 +110,19 @@ add the secrets `GITHUB_TOKEN` and `WANDB_API_KEY`, then use
 *Save & Run All*. The notebook clones the repository and runs the CLI commands
 above; results are saved in the notebook output (`/kaggle/working/outputs`).
 
+### Resuming an interrupted run
+
+Each run keeps `last.pt` (full training state, removed when training finishes) next to `best.pt`.
+To continue on any machine, copy those files and `history.json` into one folder and set `train.resume_from`:
+
+```bash
+python -m src.cli train --task classification --config configs/cls_scratch.yaml \
+    --set train.resume_from=path/to/last.pt
+```
+
+Use `best.pt` if `last.pt` is not available: training continues from that epoch with a new optimizer.
+Keep the same `train.epochs` and `data.batch_size` so the learning rate schedule stays on track.
+
 ### Quick local check (CPU)
 
 ```bash

@@ -44,6 +44,7 @@ train:
   amp: true
   save_checkpoint: true
   max_batches: null   # limit batches per epoch, only for quick smoke tests
+  resume_from: null   # last.pt or best.pt of an interrupted run to continue from
 
 tracking:
   backend: wandb      # wandb | none

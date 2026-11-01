@@ -6,10 +6,17 @@ the from-scratch encoder and a pretrained one go through the same loop.
 Per epoch it logs train/val loss and accuracy, keeps the best checkpoint by
 validation accuracy, and stops early when validation accuracy has not
 improved for ``early_stopping_patience`` epochs.
+
+``last.pt`` holds the full training state after every epoch and is removed when
+training finishes. ``train.resume_from`` continues an interrupted run from a
+``last.pt``, or from a ``best.pt`` (weights only: the optimizer starts fresh and
+the learning rate schedule jumps to that epoch).
 """
 import json
 import math
+import shutil
 import time
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -80,6 +87,7 @@ class Trainer:
         steps_per_epoch = len(train_loader)
         if self.max_batches:
             steps_per_epoch = min(steps_per_epoch, self.max_batches)
+        self.steps_per_epoch = steps_per_epoch
         epochs = self.train_cfg["epochs"]
 
         self.criterion = nn.CrossEntropyLoss(
@@ -102,11 +110,12 @@ class Trainer:
         epochs = self.train_cfg["epochs"]
         patience = self.train_cfg.get("early_stopping_patience", epochs)
         checkpoint_path = self.output_dir / "best.pt"
+        last_path = self.output_dir / "last.pt"
         result = TrainResult()
-        start = time.time()
-        epochs_without_improvement = 0
+        last_epoch, epochs_without_improvement = self._restore(result, checkpoint_path)
+        start = time.time() - sum(row["epoch_time_sec"] for row in result.history)
 
-        for epoch in range(1, epochs + 1):
+        for epoch in range(last_epoch + 1, epochs + 1):
             epoch_start = time.time()
             train_loss, train_acc = self._train_one_epoch(epoch)
             val_loss, val_acc = self.evaluate(self.val_loader)
@@ -140,10 +149,27 @@ class Trainer:
                     result.checkpoint_path = str(checkpoint_path)
             else:
                 epochs_without_improvement += 1
-                if epochs_without_improvement >= patience:
-                    print(f"Early stopping: no val improvement for {patience} epochs")
-                    break
 
+            if self.train_cfg.get("save_checkpoint", True):
+                save_checkpoint(
+                    last_path, self.model, self.cfg, self.class_names, self.norm_stats, epoch,
+                    {"val_acc": val_acc, "val_loss": val_loss},
+                    training_state={
+                        "optimizer": self.optimizer.state_dict(),
+                        "scheduler": self.scheduler.state_dict(),
+                        "scaler": self.scaler.state_dict(),
+                        "best_val_acc": result.best_val_acc,
+                        "best_epoch": result.best_epoch,
+                        "epochs_without_improvement": epochs_without_improvement,
+                        "history": result.history,
+                    },
+                )
+
+            if epochs_without_improvement >= patience:
+                print(f"Early stopping: no val improvement for {patience} epochs")
+                break
+
+        last_path.unlink(missing_ok=True)
         result.epochs_run = len(result.history)
         result.elapsed_sec = time.time() - start
         self.logger.log_summary({
@@ -155,6 +181,63 @@ class Trainer:
         if result.checkpoint_path:
             self.logger.log_checkpoint(result.checkpoint_path, f"{self.output_dir.name}-best")
         return result
+
+    def _restore(self, result, checkpoint_path):
+        """Load ``train.resume_from`` if set; returns (last finished epoch, epochs without improvement)."""
+        resume_from = self.train_cfg.get("resume_from")
+        if not resume_from:
+            return 0, 0
+
+        resume_from = Path(resume_from)
+        checkpoint = torch.load(resume_from, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(checkpoint["model_state"])
+        epoch = checkpoint["epoch"]
+        state = checkpoint.get("training_state")
+        if state:
+            self.optimizer.load_state_dict(state["optimizer"])
+            self.scheduler.load_state_dict(state["scheduler"])
+            if state["scaler"]:
+                self.scaler.load_state_dict(state["scaler"])
+            result.best_val_acc = state["best_val_acc"]
+            result.best_epoch = state["best_epoch"]
+            result.history = state["history"]
+            epochs_without_improvement = state["epochs_without_improvement"]
+            best_source = resume_from.parent / "best.pt"
+        else:
+            self._skip_schedule_to(epoch)
+            result.best_val_acc = checkpoint["metrics"]["val_acc"]
+            result.best_epoch = epoch
+            result.history = self._read_history(resume_from.parent, epoch)
+            epochs_without_improvement = 0
+            best_source = resume_from
+
+        # Keep the best weights in this run's folder in case the new epochs never beat them
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        if best_source.exists() and best_source.resolve() != checkpoint_path.resolve():
+            shutil.copyfile(best_source, checkpoint_path)
+        if checkpoint_path.exists():
+            result.checkpoint_path = str(checkpoint_path)
+        self._write_history(result.history)
+
+        kind = "full training state" if state else "weights only, new optimizer"
+        print(f"Resuming from {resume_from} after epoch {epoch} ({kind}); "
+              f"best val acc so far {result.best_val_acc:.4f} at epoch {result.best_epoch}")
+        return epoch, epochs_without_improvement
+
+    def _skip_schedule_to(self, epoch):
+        self.scheduler.last_epoch = epoch * self.steps_per_epoch - 1
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)  # step() normally follows optimizer.step()
+            self.scheduler.step()
+
+    @staticmethod
+    def _read_history(run_dir, last_epoch):
+        path = Path(run_dir) / "history.json"
+        if not path.exists():
+            print(f"No history.json in {run_dir}: curves will start after epoch {last_epoch}")
+            return []
+        with open(path, "r", encoding="utf-8") as f:
+            return [row for row in json.load(f) if row["epoch"] <= last_epoch]
 
     def _train_one_epoch(self, epoch):
         self.model.train()
