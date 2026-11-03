@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+bin/
+lib/
+lib64
+lib64/
+include/
+share/
+pyvenv.cfg
 .ipynb_checkpoints/
 
 # Training outputs (checkpoints, logs, figures are shared via Drive / W&B)
