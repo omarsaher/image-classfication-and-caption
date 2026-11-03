@@ -22,8 +22,9 @@ src/
   tuning/                    grid and random search
   evaluation/                metrics and checkpoint evaluation
   visualization/             plots and Grad-CAM
-  tracking/                  experiment tracking (Weights & Biases)
+  tracking/                  experiment tracking (MLflow; Weights & Biases optional)
   cli.py                     command line entry point
+reports/figures/             figures used in the report
 outputs/                     run results (not committed)
 ```
 
