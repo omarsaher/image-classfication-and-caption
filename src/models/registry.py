@@ -5,10 +5,12 @@ class implementing ``Encoder`` and call ``register_encoder`` with its name;
 training, evaluation and the CLI then work with it unchanged.
 """
 from src.models.classifier import ImageClassifier
+from src.models.encoders.alexnet import AlexNet
 from src.models.encoders.scratch_resnet import ScratchResNet
 
 ENCODERS = {
     "scratch_resnet": ScratchResNet,
+    "alexnet": AlexNet,
 }
 
 # Keys of the model config that belong to the classifier, not the encoder
