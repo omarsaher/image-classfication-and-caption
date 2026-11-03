@@ -17,3 +17,5 @@ wandb/
 Thumbs.db
 .vscode/
 .idea/
+
+.env
